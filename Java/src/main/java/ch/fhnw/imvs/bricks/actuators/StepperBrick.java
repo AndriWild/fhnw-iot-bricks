@@ -4,8 +4,9 @@
 package ch.fhnw.imvs.bricks.actuators;
 
 import ch.fhnw.imvs.bricks.core.Proxy;
+import ch.fhnw.imvs.bricks.impl.AnalogOutputBrick;
 
-public class StepperBrick extends MotorBrick {
+public final class StepperBrick extends AnalogOutputBrick {
 
   private StepperBrick(Proxy proxy, String brickID){
    super(proxy, brickID);

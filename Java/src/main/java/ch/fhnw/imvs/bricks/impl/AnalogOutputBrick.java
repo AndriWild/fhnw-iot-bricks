@@ -1,7 +1,7 @@
 // Copyright (c) 2022 FHNW, Switzerland. All rights reserved.
 // Licensed under MIT License, see LICENSE for details.
 
-package ch.fhnw.imvs.bricks.actuators;
+package ch.fhnw.imvs.bricks.impl;
 
 import ch.fhnw.imvs.bricks.core.Brick;
 import ch.fhnw.imvs.bricks.core.Proxy;
@@ -9,12 +9,12 @@ import ch.fhnw.imvs.bricks.core.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public abstract class MotorBrick extends Brick {
+public abstract class AnalogOutputBrick extends Brick {
 
   protected volatile int currentPosition = 0;
   protected volatile int targetPosition = 0;
 
-  protected MotorBrick(Proxy proxy, String brickID) {
+  protected AnalogOutputBrick(Proxy proxy, String brickID) {
     super(proxy, brickID);
   }
 

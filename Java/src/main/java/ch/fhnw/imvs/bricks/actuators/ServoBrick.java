@@ -4,13 +4,15 @@
 package ch.fhnw.imvs.bricks.actuators;
 
 import ch.fhnw.imvs.bricks.core.Proxy;
+import ch.fhnw.imvs.bricks.impl.AnalogOutputBrick;
 
-public final class ServoBrick extends MotorBrick {
+public final class ServoBrick extends AnalogOutputBrick {
+
     private ServoBrick(Proxy proxy, String brickID) {
         super(proxy, brickID);
     }
 
-
+    @Override
     public void setPosition(int position) { // degree
         if (position < 0 || position > 180) {
             throw new IllegalArgumentException();
