@@ -13,7 +13,7 @@
 #define MAX_ACCEL           5000.0 
 
 const char *ssid           = "MY_SSID"; // TODO
-const char *password       = "#AndrisHotpot"; // TODO
+const char *password       = "MY_PASSWORD"; // TODO
 const char *host           = "test.mosquitto.org"; // TODO
 const char *topicStrTarget = "bricks/0000-0008/target"; // TODO
 const char *topicStrActual = "bricks/0000-0008/actual"; // TODO
@@ -28,6 +28,7 @@ Adafruit_MQTT_Subscribe topic(&mqtt, topicStrTarget);
 
 AccelStepper stepper (AccelStepper::FULL4WIRE, 32, 14, 22, 23);
 
+int standbyPin   = 26;
 int sensorPin    = 4;
 int allSteps     = 0;
 float error      = 0;
@@ -58,8 +59,10 @@ void connectWifi(){
 void setup() {
   Serial.begin(9600);
 
-  pinMode(sensorPin, INPUT);
+  pinMode(sensorPin,  INPUT);
+  pinMode(standbyPin, OUTPUT);
 
+  stepper.setEnablePin(standbyPin);
   stepper.setMaxSpeed       (MAX_SPEED);
   stepper.setAcceleration   (MAX_ACCEL);
   stepper.setCurrentPosition(0);
@@ -78,6 +81,7 @@ void setup() {
 }
 
 void zeroing(){
+  stepper.enableOutputs();
   // Running quickly to zero point
   stepper.setSpeed(400);
   while(digitalRead(sensorPin)) { stepper.runSpeed(); }
@@ -96,12 +100,15 @@ void zeroing(){
   stepper.setCurrentPosition(0);
   stepper.setSpeed(DEFAULT_SPEED);
   stepperAngle = 0;
+  stepper.disableOutputs();
 }
 
 void handleMqttMessage(char *buf, uint16_t len) {
   if (len == 2) {
     int pos = (int) ((buf[0] << 8) | buf[1]);
+    stepper.enableOutputs();
     setStepperPosition(pos);
+    stepper.disableOutputs();
   }
 }
 
