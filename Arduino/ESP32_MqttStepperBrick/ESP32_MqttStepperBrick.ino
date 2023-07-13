@@ -13,13 +13,12 @@
 #define MAX_ACCEL           5000.0 
 
 const char *ssid           = "MY_SSID"; // TODO
-const char *password       = "MY_PASSWORD"; // TODO
+const char *password       = ""; // TODO
 const char *host           = "test.mosquitto.org"; // TODO
 const char *topicStrTarget = "bricks/0000-0008/target"; // TODO
 const char *topicStrActual = "bricks/0000-0008/actual"; // TODO
 
 const int port     = 8883;
-const int servoPin = 12; // Grove adapter D12
 
 WiFiClientSecure client;
 
@@ -31,8 +30,8 @@ AccelStepper stepper (AccelStepper::FULL4WIRE, 32, 14, 22, 23);
 int standbyPin   = 26;
 int sensorPin    = 4;
 int allSteps     = 0;
-float error      = 0;
 int stepperAngle = 0;
+double error     = 0;
 
 void connectWifi(){
     // Connect to WiFi access point.
@@ -80,9 +79,25 @@ void setup() {
   MQTT_connect();
 }
 
+void loop() {
+  if (mqtt.connected()) {
+    //Serial.println("MQTT: Connected");
+    mqtt.processPackets(10000); // ms, calls callbacks
+    if (!mqtt.ping()) {
+      mqtt.disconnect();  
+    }
+  } else {
+    int result = mqtt.connect(); // calls client.connect()
+    if (result != 0) {
+      Serial.println(mqtt.connectErrorString(result));
+      delay(3000);
+    }
+  }
+}
+
 void zeroing(){
   stepper.enableOutputs();
-  // Running quickly to zero point
+  // running to zero point
   stepper.setSpeed(400);
   while(digitalRead(sensorPin)) { stepper.runSpeed(); }
   stepper.stop();
@@ -91,16 +106,50 @@ void zeroing(){
   stepper.move(-20);
   stepper.runToPosition();
 
-  // Running slowly to zero
+  // running slowly to zero
   stepper.setSpeed(30);
   while(digitalRead(sensorPin)) { stepper.runSpeed(); }
-  // Zero position found
+  // zero position found
   stepper.stop();
 
   stepper.setCurrentPosition(0);
   stepper.setSpeed(DEFAULT_SPEED);
+  stepper.move(STEPS/2);
+  stepper.runToPosition();
+  stepper.setCurrentPosition(0);
   stepperAngle = 0;
   stepper.disableOutputs();
+}
+
+void setStepperPosition(int targetAngle){
+  
+    // angel to move to reach the new target
+    int deltaAngle = shortestDistance(targetAngle, stepperAngle);
+
+    // steps to move deltaAngle
+    double deltaSteps = ((STEPS / 360.0) *  deltaAngle);
+
+    // effective steps to move by adding error of previous calculations
+    int stepsToMove = deltaSteps + error;
+
+    // calculation of the data type convertion error
+    error = error + deltaSteps - stepsToMove;
+
+    stepper.move(stepsToMove);
+    stepper.runToPosition();
+    stepperAngle = targetAngle;
+    delay(100);
+
+    float batt = 3.7; // V, TODO
+    int b = batt * 100.0f;
+
+    uint8_t payload[] = {
+      highByte(b), lowByte(b),
+      highByte(targetAngle), lowByte(targetAngle)
+    };
+    printf("batt = %.2f, newAngle= %d\n", batt, targetAngle);
+    printf("publish to %s\n", topicStrTarget);
+    mqtt.publish(topicStrActual, payload, sizeof(payload));
 }
 
 void handleMqttMessage(char *buf, uint16_t len) {
@@ -108,7 +157,7 @@ void handleMqttMessage(char *buf, uint16_t len) {
     int pos = (int) ((buf[0] << 8) | buf[1]);
     stepper.enableOutputs();
     setStepperPosition(pos);
-    stepper.disableOutputs();
+    stepper.disableOutputs(); // save power by turning off the motor coils
   }
 }
 
@@ -134,52 +183,6 @@ int shortestDistance(int target, int stepperAngle){
   return delta;
 }
 
-void setStepperPosition(int targetAngle){
-    int deltaAngle  = shortestDistance(targetAngle, stepperAngle);
-    int stepsToMove = ((STEPS / 360.0) *  deltaAngle) + error;
-
-    error += ((STEPS / 360.0) *  deltaAngle) - stepsToMove;
-
-    // printf("target:\t%d\t",       targetAngle);
-    // printf("stepperAngle:\t%d\t", stepperAngle);
-    // printf("steps:\t%f\t",        stepsToMove);
-    // printf("deltaAngle:\t%d\t",   deltaAngle);
-    // printf("error:\t%f\n",        error);
-
-    stepper.move(stepsToMove);
-    stepper.runToPosition();
-    stepperAngle = targetAngle;
-
-    float batt = 3.7; // V, TODO
-    int b = batt * 100.0f;
-
-    uint8_t payload[] = {
-      highByte(b), lowByte(b),
-      highByte(targetAngle), lowByte(targetAngle)
-    };
-    printf("batt = %.2f, newAngle= %d\n", batt, targetAngle);
-    printf("publish to %s\n", topicStrTarget);
-    mqtt.publish(topicStrActual, payload, sizeof(payload));
-}
-
-void loop() {
-  if (mqtt.connected()) {
-    //Serial.println("MQTT: Connected");
-    mqtt.processPackets(10000); // ms, calls callbacks
-    if (!mqtt.ping()) {
-      mqtt.disconnect();  
-    }
-  } else {
-    int result = mqtt.connect(); // calls client.connect()
-    if (result != 0) {
-      Serial.println(mqtt.connectErrorString(result));
-      delay(3000);
-    }
-  }
-}
-
-// Function to connect and reconnect as necessary to the MQTT server.
-// Should be called in the loop function and it will take care if connecting.
 void MQTT_connect() {
   int8_t ret;
 
